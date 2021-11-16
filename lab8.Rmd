@@ -175,3 +175,5 @@ ggplot(data = homes_predictions, aes(x = .resid)) +
 #indicates normal distribution
 ```
 
+
+# BRANCHES ARE AWESOME
