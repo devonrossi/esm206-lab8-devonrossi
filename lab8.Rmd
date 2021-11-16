@@ -1,0 +1,177 @@
+---
+title: "Lab 8"
+author: "Devon Rossi"
+date: "11/16/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(modelsummary)
+library(corrplot)
+library(broom)
+library(here)
+```
+
+### Read in slo_homes.csv
+```{r}
+homes <- read_csv(here("slo_homes.csv"))
+```
+
+### Create a subset with 4 cities
+
+Task: Create a subset called homes_subset that only contains observations where the city is either:
+- "San Luis Obispo"
+- "Atascadero"
+- "Arroyo Grande"
+- "Santa Maria-Orcutt"
+
+```{r}
+homes_subset <- homes %>% 
+  filter(City %in% c("San Luis Obispo", "Atascadero", "Arroyo Grande", "Santa Maria-Orcutt"))
+
+#use %in% operator and c() to create vectors (combine)
+#use unique(homes_subset$City) to return vectors to make sure filter is correctly returning 4 cities
+```
+
+### A little exploration
+
+Task: create a summary table that has the mean and SD of homes prices grouped by city and sale status
+
+```{r, include = FALSE, eval = FALSE}
+homes_subset %>% 
+  group_by(City, Status) %>% 
+  summarize(mean_price = mean(Price),
+            sd_price = sd(Price),
+            mean_sqft = mean(SqFt))
+
+#include = FALSE (hide in knitted document)
+#eval = FALSE (code doesn't run)
+```
+
+Task: explore the relationship between square footage and home price
+```{r}
+ggplot(data = homes_subset, aes(x = SqFt, y = Price))+
+  geom_point() +
+  geom_smooth(method = lm)
+
+#outliers - what might explain this? (i.e. location)
+```
+
+
+
+
+
+### Try a few linear models
+
+Use multiple linear regression to investigate relationships between several predictor variables and home Price. 
+
+Create 2 different permutations of this model:
+
+(1) Price ~ City, Bedrooms, Bathrooms, SqFt, Status (lm1)
+(2) Price ~ City, SqFt, Status (lm2)
+(3) Try another one (lm3)
+
+```{r}
+lm1 <- lm(Price ~ City + Bedrooms + Bathrooms + SqFt + Status, data = homes_subset)
+  
+lm2 <- lm(Price ~ City + SqFt + Status, data = homes_subset)
+  
+lm3 <- lm(Price ~ SqFt, data = homes_subset)
+
+# If I wanted SLO to be the referene level:
+# Use fct_relevel to specify a new reference level
+
+new_homes_subset <- homes_subset %>% 
+  mutate(City = fct_relevel(City, "San Luis Obispo"))
+
+
+# This will use SLO as the reference level for city
+lm_slo <- lm(Price ~ City + SqFt, data = new_homes_subset)
+
+summary(lm_slo)
+```
+
+In Console: summary(lm1)
+
+City Reference Level: Arroyo Grande (all 0s)
+
+
+Coefficient Interpretation:
+Santa Maria-Orcutt - If homes are otherwise similar, home in Santa Maria-Orcutt would sell for $260,000 LESS than home in Arroyo Grande (comparing to reference level for city)
+
+Adjusted R-squared:  0.5376 
+53% of variance in Price is explained by variables in this model 
+As R-squared goes up, you are essentially capturing more variance within dependent variables in model
+___________________________________________________________________________________________
+In Console: summary(lm2)
+
+R-squared (simplified to city, sqft, status): 52% (a little lower, consider balance of model fit and complexity)
+
+AIC (quantitative comparison b/w model fit and complexity) - greater than model 1, not as effective in capturing model fit and complexity
+
+
+
+### Explore correlations between quantitative variables
+Co-linearity (problematic inclusion of variables, such as bedroom) - strange correlation 
+
+Task: make a subset called homes_quant (starting from homes_subset) that only contains the variables from Price through SqFt)
+
+```{r}
+homes_quant <- homes_subset %>% 
+  select(Price:SqFt)
+
+#use colon to select a range of columns
+
+homes_cor <- cor(homes_quant)
+
+corrplot(homes_cor, method = "ellipse")
+
+#visualize correlation
+```
+
+
+### Compare AIC values
+```{r}
+AIC(lm1) #AIC: 11140.72
+AIC(lm2) #AIC: 11148
+
+#Lower AIC indicates better balance, so trade-off of model fit and coeff estimates for first model is still more efficient
+#Meaning the dded complexity (more variables) is not as much of a sacrifice 
+```
+### Use model_summary() to return multiple model outputs
+
+```{r}
+modelsummary(list(lm1, lm2, lm3))
+```
+
+
+### Check out diagnostic plots for lm1
+```{r}
+plot(lm1)
+
+
+#normal qq - normal distribution of residuals
+
+#residuals vs. leverage - cook's distance greater than 1 (more leverage)
+#outliers in cook's distance plot should match outliers in exploratory analysis
+```
+
+
+
+### Use broom::augment() to return the predictions for existing observations
+```{r}
+homes_predictions <-augment(lm1)
+
+#Actual Price: Model predicts what the home will be sold for given predictor variables in model
+
+
+#Make a histogram of residuals from this model
+# need one variable within aes function for histogram
+ggplot(data = homes_predictions, aes(x = .resid)) +
+  geom_histogram(bins = 15)
+
+#indicates normal distribution 
+```
+
