@@ -172,6 +172,6 @@ homes_predictions <-augment(lm1)
 ggplot(data = homes_predictions, aes(x = .resid)) +
   geom_histogram(bins = 15)
 
-#indicates normal distribution 
+#indicates normal distribution
 ```
 
